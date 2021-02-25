@@ -1,0 +1,444 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create ECS Cluster.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  VpcId:
+    Type: String
+    MinLength: 12
+    MaxLength: 21
+    AllowedPattern: vpc-[0-9a-z]*
+  VpcCider:
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  ELB01SubnetAId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  ELB02SubnetCId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  WEB01SubnetCId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  WEB02SubnetAId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  CreateEFS:
+    Type: String
+    Default: false
+    AllowedValues:
+      - true
+      - false
+  ECSV2TaskCPUUnit:
+    Type: String
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  ECSV2TaskMemory:
+    Type: String
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 8192
+  ECSWordschoolTaskCPUUnit:
+    Type: String
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  ECSWordschoolTaskMemory:
+    Type: String
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 8192
+  ECSAdminTaskCPUUnit:
+    Type: String
+    AllowedValues:
+      - 256
+      - 512
+      - 1024
+      - 2048
+      - 4096
+  ECSAdminTaskMemory:
+    Type: String
+    AllowedValues:
+      - 512
+      - 1024
+      - 2048
+      - 4096
+      - 8192
+  ECSV2ContainerPort:
+    Type: Number
+    Default: 8080
+  ECSWordschoolContainerPort:
+    Type: Number
+    Default: 8081
+  ECSAdminContainerPort:
+    Type: Number
+    Default: 8082
+  ECSV2ImageName:
+    Type: String
+  ECSWorldschoolImageName:
+    Type: String
+  ECSAdminImageName:
+    Type: String
+  ECSV2TaskDesiredCount:
+    Type: Number
+    Default: 3
+  ECSWorldschoolTaskDesiredCount:
+    Type: Number
+    Default: 3
+  ECSAdminTaskDesiredCount:
+    Type: Number
+    Default: 3
+  ECSFilesyStemId:
+    Type: String
+  ###ECSFilesyStemId2:
+  ###  Type: String
+  V2TargetGroupARN:
+    Type: String
+  WorldschoolTargetGroupARN:
+    Type: String
+  AdminTargetGroupARN:
+    Type: String
+
+#--------------------------------#
+# Conditions section
+#--------------------------------#
+Conditions:
+  CreateEFS:
+    !Equals [ !Ref CreateEFS, "true"]
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  #
+  # IAM Role
+  #
+  ECSTaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs-tasks.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+        - PolicyName: AmazonECSTaskExecutionRolePolicy
+          PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                # Allow the ECS Tasks to download images from ECR
+                - 'ecr:GetAuthorizationToken'
+                - 'ecr:BatchCheckLayerAvailability'
+                - 'ecr:GetDownloadUrlForLayer'
+                - 'ecr:BatchGetImage'
+                # Allow the ECS tasks to upload logs to CloudWatch
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Resource: '*'
+
+  #
+  # Security Group
+  #
+  ECSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ServiceName}-ecs-sg-${EnvironmentType}
+      GroupDescription: !Sub ${ServiceName}-ecs-sg-${EnvironmentType}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: ""
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: ""
+        #- IpProtocol: "tcp"
+        #  FromPort: "2049"
+        #  ToPort: "2049"
+        #  CidrIp: "172.31.0.0/16"
+        #  Description: ""
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCider
+          Description: ""
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-ecs-sg-${EnvironmentType}
+      VpcId: !Ref VpcId
+
+  #
+  # ECS Cluster
+  #
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub "${ServiceName}-cluster-${EnvironmentType}"
+
+  #
+  # ECS Log Group(CloudWatchLogs)
+  #
+  ECSLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/ecs/logs/${ServiceName}-log-group-${EnvironmentType}"
+
+  #
+  # ECS TaskDefinition
+  #
+  V2ECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ServiceName}-v2-task-definition-${EnvironmentType}"
+      Cpu: !Ref ECSV2TaskCPUUnit
+      Memory: !Ref ECSV2TaskMemory
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      #ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Name: !Sub "${ServiceName}-v2-container-${EnvironmentType}"
+          Image: !Ref ECSV2ImageName
+          Cpu: !Ref ECSV2TaskCPUUnit
+          Memory: !Ref ECSV2TaskMemory
+          PortMappings:
+            - ContainerPort: !Ref ECSV2ContainerPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ECSLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: !Ref ServiceName
+          MountPoints:
+            - SourceVolume: !Sub ${ServiceName}-efs-${EnvironmentType}
+              ContainerPath: /home/
+      Volumes:
+        - Name: !Sub ${ServiceName}-efs-${EnvironmentType}
+          EFSVolumeConfiguration:
+            FilesystemId: !If
+              - CreateEFS
+              #- !ImportValue feelnote-efs-id-stg
+              - Fn::ImportValue: !Sub ${ServiceName}-efs-id-${EnvironmentType}
+              - !Ref ECSFilesyStemId
+            TransitEncryption: DISABLED
+
+  WorldschoolECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ServiceName}-worldschool-task-definition-${EnvironmentType}"
+      Cpu: !Ref ECSWordschoolTaskCPUUnit
+      Memory: !Ref ECSWordschoolTaskMemory
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      #ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Name: !Sub "${ServiceName}-worldschool-container-${EnvironmentType}"
+          Image: !Ref ECSWorldschoolImageName
+          Cpu: !Ref ECSWordschoolTaskCPUUnit
+          Memory: !Ref ECSWordschoolTaskMemory
+          PortMappings:
+            - ContainerPort: !Ref ECSWordschoolContainerPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ECSLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: !Ref ServiceName
+          MountPoints:
+            - SourceVolume: !Sub ${ServiceName}-efs-${EnvironmentType}
+              ContainerPath: /home/
+      Volumes:
+        - Name: !Sub ${ServiceName}-efs-${EnvironmentType}
+          EFSVolumeConfiguration:
+            FilesystemId: !If
+              - CreateEFS
+              #- !ImportValue feelnote-efs-id-stg
+              - Fn::ImportValue: !Sub ${ServiceName}-efs-id-${EnvironmentType}
+              - !Ref ECSFilesyStemId
+            TransitEncryption: DISABLED
+
+  AdminECSTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub "${ServiceName}-admin-task-definition-${EnvironmentType}"
+      Cpu: !Ref ECSAdminTaskCPUUnit
+      Memory: !Ref ECSAdminTaskMemory
+      NetworkMode: awsvpc
+      ExecutionRoleArn: !Ref ECSTaskExecutionRole
+      #ExecutionRoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/ecsTaskExecutionRole"
+      RequiresCompatibilities:
+        - FARGATE
+      ContainerDefinitions:
+        - Name: !Sub "${ServiceName}-admin-container-${EnvironmentType}"
+          Image: !Ref ECSAdminImageName
+          Cpu: !Ref ECSAdminTaskCPUUnit
+          Memory: !Ref ECSAdminTaskMemory
+          PortMappings:
+            - ContainerPort: !Ref ECSAdminContainerPort
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref ECSLogGroup
+              awslogs-region: !Ref "AWS::Region"
+              awslogs-stream-prefix: !Ref ServiceName
+          MountPoints:
+            - SourceVolume: !Sub ${ServiceName}-efs-${EnvironmentType}
+              ContainerPath: /home/
+      Volumes:
+        - Name: !Sub ${ServiceName}-efs-${EnvironmentType}
+          EFSVolumeConfiguration:
+            FilesystemId: !If
+              - CreateEFS
+              #- !ImportValue feelnote-efs-id-stg
+              - Fn::ImportValue: !Sub ${ServiceName}-efs-id-${EnvironmentType}
+              - !Ref ECSFilesyStemId
+            TransitEncryption: DISABLED
+
+  #
+  # ECS Service
+  #
+  V2ECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${ServiceName}-v2-service-${EnvironmentType}
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref ECSV2TaskDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          #AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref WEB01SubnetCId
+            - !Ref WEB02SubnetAId
+      TaskDefinition: !Ref V2ECSTaskDefinition
+      LoadBalancers:
+        - TargetGroupArn: !Ref V2TargetGroupARN
+          ContainerPort: !Ref ECSV2ContainerPort
+          ContainerName: !Sub ${ServiceName}-v2-container-${EnvironmentType}
+      PlatformVersion: 1.4.0
+
+  WorldschoolECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${ServiceName}-worldschool-${EnvironmentType}
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref ECSWorldschoolTaskDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          #AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref WEB01SubnetCId
+            - !Ref WEB02SubnetAId
+      TaskDefinition: !Ref WorldschoolECSTaskDefinition
+      LoadBalancers:
+        - TargetGroupArn: !Ref WorldschoolTargetGroupARN
+          ContainerPort: !Ref ECSWordschoolContainerPort
+          ContainerName: !Sub ${ServiceName}-worldschool-container-${EnvironmentType}
+      PlatformVersion: 1.4.0
+
+  AdminECSService:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub ${ServiceName}-admin-${EnvironmentType}
+      Cluster: !Ref ECSCluster
+      LaunchType: FARGATE
+      DesiredCount: !Ref ECSAdminTaskDesiredCount
+      DeploymentConfiguration:
+        MaximumPercent: 200
+        MinimumHealthyPercent: 75
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          #AssignPublicIp: ENABLED
+          AssignPublicIp: DISABLED
+          SecurityGroups:
+            - !Ref ECSSecurityGroup
+          Subnets:
+            - !Ref WEB01SubnetCId
+            - !Ref WEB02SubnetAId
+      TaskDefinition: !Ref AdminECSTaskDefinition
+      LoadBalancers:
+        - TargetGroupArn: !Ref AdminTargetGroupARN
+          ContainerPort: !Ref ECSAdminContainerPort
+          ContainerName: !Sub ${ServiceName}-admin-container-${EnvironmentType}
+      PlatformVersion: 1.4.0
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+Outputs:
+  ECSClusterID:
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${ServiceName}-ecs-cluster-id-${EnvironmentType}
+
+  V2ECSServiceName:
+    Value: !GetAtt V2ECSService.Name
+    Export:
+      Name: !Sub ${ServiceName}-v2-service-name-${EnvironmentType}
+
+  WorldschoolECSServiceName:
+    Value: !GetAtt WorldschoolECSService.Name
+    Export:
+      Name: !Sub ${ServiceName}-worldschool-service-name-${EnvironmentType}
+
+  AdminECSServiceName:
+    Value: !GetAtt AdminECSService.Name
+    Export:
+      Name: !Sub ${ServiceName}-admin-service-name-${EnvironmentType}

@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  CloudFormation Nest Template Parent.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  TemplateBucket:
+    Type: String
+  ServiceName:
+    Type: String
+  EnvironmentType:
+    Type: String
+  VpcId:
+    Type: String
+  VpcCider:
+    Type: String
+  Web01SubnetCId:
+    Type: String
+  Web02SubnetAId:
+    Type: String
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  NestEFS:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/infrastructure/efs.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        VpcId: !Ref VpcId
+        VpcCider: !Ref VpcCider
+        Web01SubnetCId: !Ref Web01SubnetCId
+        Web02SubnetAId: !Ref Web02SubnetAId

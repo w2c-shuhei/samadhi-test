@@ -1,0 +1,158 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create VPC endpoint.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  VpcId:
+    Type: String
+    MinLength: 12
+    MaxLength: 21
+    AllowedPattern: vpc-[0-9a-z]*
+  VpcCider:
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Web01SubnetCId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  Web02SubnetAId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  RouteTableId:
+    Type: String
+    MinLength: 12
+    MaxLength: 21
+    AllowedPattern: rtb-[0-9a-z]*
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  #
+  # Create VPC Endpoint
+  #
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ServiceName}-endpoint-sg-${EnvironmentType}
+      GroupDescription: !Sub ${ServiceName}-endpoint-sg-${EnvironmentType}
+      SecurityGroupIngress:
+        - IpProtocol: -1
+          CidrIp: !Ref VpcCider
+          Description: ""
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-endpoint-sg-${EnvironmentType}
+      VpcId: !Ref VpcId
+
+  EcrDkpEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.dkr'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref Web01SubnetCId
+        - !Ref Web02SubnetAId
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Principal: "*"
+            Action: "*"
+            Resource: "*"
+
+  EcrApiEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.ecr.api'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref Web01SubnetCId
+        - !Ref Web02SubnetAId
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Principal: "*"
+            Action: "*"
+            Resource: "*"
+
+  LogsEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.logs'
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref Web01SubnetCId
+        - !Ref Web02SubnetAId
+      PrivateDnsEnabled: true
+      SecurityGroupIds:
+        - !Ref SecurityGroup
+      PolicyDocument:
+        Statement:
+          -
+            Effect: "Allow"
+            Principal: "*"
+            Action: "*"
+            Resource: "*"
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref VpcId
+      RouteTableIds:
+        - !Ref RouteTableId
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+Outputs:
+  EcrDkpEndpoint:
+    Value: !Ref EcrDkpEndpoint
+    Export:
+      Name: !Sub ${ServiceName}-ecr-dkp-endpoint-id-${EnvironmentType}
+
+  EcrApiEndpoint:
+    Value: !Ref EcrApiEndpoint
+    Export:
+      Name: !Sub ${ServiceName}-ecr-api-endpoint-id-${EnvironmentType}
+
+  LogsEndpoint:
+    Value: !Ref LogsEndpoint
+    Export:
+      Name: !Sub ${ServiceName}-logs-endpoint-id-${EnvironmentType}
+
+  S3Endpoint:
+    Value: !Ref S3Endpoint
+    Export:
+      Name: !Sub ${ServiceName}-s3-endpoint-id-${EnvironmentType}

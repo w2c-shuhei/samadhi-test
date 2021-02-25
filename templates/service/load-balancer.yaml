@@ -1,0 +1,404 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create ELB(Application Load Balancer).
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  LoadBalancerPublic:
+    Type: String
+    Default: true
+    AllowedValues:
+      - true
+      - false
+  SubDomainNmae1:
+    Type: String
+    Default: v2.feelnote.org
+  SubDomainNmae2:
+    Type: String
+    Default: worldschool.feelnote.org
+  SubDomainNmae3:
+    Type: String
+    Default: admin.feelnote.org
+  VpcId:
+    Type: String
+    Type: String
+    MinLength: 12
+    MaxLength: 21
+    AllowedPattern: vpc-[0-9a-z]*
+  VpcCider:
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  ELB01SubnetAId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  ELB02SubnetCId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  IdleTimeoutSeconds:
+    Type: Number
+    Default: 60
+    MinValue: 1
+    MaxValue: 4000
+  ListenerCertificateArn:
+    Type: String
+    #Default: *.feelnote.orgの ACM Arnを指定
+  AlbListenerSslPolicy:
+    Type: String
+    Default: ELBSecurityPolicy-2016-08
+    AllowedValues:
+      - ELBSecurityPolicy-2016-08
+      - ELBSecurityPolicy-TLS-1-0-2015-04
+      - ELBSecurityPolicy-TLS-1-1-2017-01
+      - ELBSecurityPolicy-TLS-1-2-2017-01
+      - ELBSecurityPolicy-TLS-1-2-Ext-2018-06
+      - ELBSecurityPolicy-FS-2018-06
+      - ELBSecurityPolicy-FS-1-1-2019-08
+      - ELBSecurityPolicy-FS-1-2-2019-08
+      - ELBSecurityPolicy-FS-1-2-Res-2019-08
+
+#--------------------------------#
+# Conditions section
+#--------------------------------#
+Conditions:
+  LoadBalancerPublic:
+    !Equals [ !Ref LoadBalancerPublic, "true"]
+  EnvironmentType:
+    !Equals [ !Ref EnvironmentType, "prod"]
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  #
+  # セキュリティグループの作成
+  #   - PublicSecurityGroup : HTTP/HTTPSへのアクセスをALL許可
+  #   - SecurityGroup : HTTP/HTTPSへのアクセスを制限
+  #
+  PublicSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ServiceName}-public-sg-${EnvironmentType}
+      GroupDescription: !Sub ${ServiceName}-public-sg-${EnvironmentType}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+          Description: ""
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: ""
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-public-sg-${EnvironmentType}
+      VpcId: !Ref VpcId
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ServiceName}-sg-${EnvironmentType}
+      GroupDescription: !Sub ${ServiceName}-sg-${EnvironmentType}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 203.165.144.204/32
+          Description: ""
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 203.165.144.204/32
+          Description: ""
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-sg-${EnvironmentType}
+      VpcId: !Ref VpcId
+
+  #
+  # ターゲットグループの作成
+  #
+  V2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub ${ServiceName}-tg-${EnvironmentType}
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 8080
+      #Port: 80
+      TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: slow_start.duration_seconds
+          Value: 0
+        - Key: stickiness.enabled
+          Value: true
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86400
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  WorldschoolTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub worldschool-tg-${EnvironmentType}
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 8081
+      TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: slow_start.duration_seconds
+          Value: 0
+        - Key: stickiness.enabled
+          Value: true
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86400
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  AdminTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: !Sub admin-tg-${EnvironmentType}
+      VpcId: !Ref VpcId
+      Protocol: HTTP
+      Port: 8082
+      TargetType: ip
+      TargetGroupAttributes:
+        - Key: deregistration_delay.timeout_seconds
+          Value: 60
+        - Key: slow_start.duration_seconds
+          Value: 0
+        - Key: stickiness.enabled
+          Value: true
+        - Key: stickiness.lb_cookie.duration_seconds
+          Value: 86400
+      Matcher:
+        HttpCode: 200-299
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 2
+      UnhealthyThresholdCount: 2
+
+  #
+  # ALBアクセスログ保存用のS3バケットの作成
+  #
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub elb-access-logs-${AWS::AccountId}-${EnvironmentType}
+
+  S3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              AWS: "arn:aws:iam::582318560864:root"
+            Action: "s3:PutObject"
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/${ServiceName}-${EnvironmentType}/AWSLogs/*"
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "delivery.logs.amazonaws.com"
+            Action: "s3:PutObject"
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}/${ServiceName}-${EnvironmentType}/AWSLogs/*"
+            Condition:
+              StringEquals:
+                s3:x-amz-acl: "bucket-owner-full-control"
+          -
+            Effect: "Allow"
+            Principal:
+              Service: "delivery.logs.amazonaws.com"
+            Action: "s3:GetBucketAcl"
+            Resource: !Sub "arn:aws:s3:::${S3Bucket}"
+
+  #
+  # ALB設定
+  #
+  ALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Sub ${ServiceName}-alb-${EnvironmentType}
+      Type: application
+      Scheme: "internet-facing"
+      Subnets:
+        - !Ref ELB01SubnetAId
+        - !Ref ELB02SubnetCId
+      # LoadBalancerPublic=ture の場合、PublicSecurityGroup を紐づけ
+      # false なら SecurityGroup のみ紐づけ
+      SecurityGroups: !If
+        - LoadBalancerPublic
+        -
+          - !Ref SecurityGroup
+          - !Ref PublicSecurityGroup
+        -
+          - !Ref SecurityGroup
+      LoadBalancerAttributes:
+        #- Key: deletion_protection.enabled
+        #  Value: true
+        - Key: idle_timeout.timeout_seconds
+          Value: !Ref IdleTimeoutSeconds
+        - Key: access_logs.s3.enabled
+          Value: true
+        - Key: access_logs.s3.bucket
+          Value: !Sub elb-access-logs-${AWS::AccountId}-${EnvironmentType}
+        - Key: access_logs.s3.prefix
+          Value: !Sub ${ServiceName}-${EnvironmentType}
+      Tags:
+        - Key: Name
+          Value: !Sub ${ServiceName}-${EnvironmentType}
+
+  # リスナー設定：HTTP(80)
+  #   - デフォルトアクションとして、全てHTTPS(443)へリダイレクト
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Protocol: HTTP
+      Port: 80
+      DefaultActions:
+        - TargetGroupArn: !Ref V2TargetGroup
+          Type: forward
+      DefaultActions:
+        - RedirectConfig:
+            Protocol: HTTPS
+            Port: 443
+            Host: "#{host}"
+            Path: /#{path}
+            Query: "#{query}"
+            StatusCode: HTTP_301
+          Type: redirect
+
+  # リスナー設定：HTTPS(443)
+  #   - デフォルトアクション : 転送先=FeelnoteTargetGroup
+  HTTPSListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ALB
+      Protocol: HTTPS
+      Port: 443
+      Certificates:
+        - CertificateArn:
+            Ref: ListenerCertificateArn
+      DefaultActions:
+        - TargetGroupArn:
+            Ref: V2TargetGroup
+          Type: forward
+      SslPolicy: !Ref AlbListenerSslPolicy
+
+  HTTPSListenerCertificate:
+    Type: AWS::ElasticLoadBalancingV2::ListenerCertificate
+    Properties:
+      Certificates:
+        - CertificateArn:
+            Ref: ListenerCertificateArn
+      ListenerArn: !Ref HTTPSListener
+
+  # リスナールール設定(HTTPS)
+  #   - 条件 : ホストヘッダー=worldschool.feelnote.org
+  #   - アクション : 転送先=WorldschoolTargetGroup
+  HTTPSListenerRuleWorldschool:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 2
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Ref SubDomainNmae2
+      Actions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref WorldschoolTargetGroup
+                Weight: 1
+          Type: forward
+
+  # リスナールール設定(HTTPS)
+  #   - 条件 : ホストヘッダー=admin.feelnote.org
+  #   - アクション : 転送先=AdminTargetGroup
+  HTTPSListenerRuleAdmin:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      ListenerArn: !Ref HTTPSListener
+      Priority: 3
+      Conditions:
+        - Field: host-header
+          Values:
+            - !Ref SubDomainNmae3
+      Actions:
+        - ForwardConfig:
+            TargetGroups:
+              - TargetGroupArn: !Ref AdminTargetGroup
+                Weight: 1
+          Type: forward
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+Outputs:
+  V2TargetGroupARN:
+    Value: !Ref V2TargetGroup
+    Export:
+      Name: !Sub ${ServiceName}-v2-tg-arn-${EnvironmentType}
+
+  WorldschoolTargetGroupARN:
+    Value: !Ref WorldschoolTargetGroup
+    Export:
+      Name: !Sub ${ServiceName}-${EnvironmentType}-worldschool-tg-arn-${EnvironmentType}
+
+  AdminTargetGroupARN:
+    Value: !Ref AdminTargetGroup
+    Export:
+      Name: !Sub ${ServiceName}-admin-tg-arn-${EnvironmentType}
+
+  AlbARN:
+    Value: !Ref ALB
+    Export:
+      Name: !Sub ${ServiceName}-alb-arn-${EnvironmentType}
+
+  AlbDnsName:
+    Value: !GetAtt ALB.DNSName
+    Export:
+      Name: !Sub ${ServiceName}-alb-name-${EnvironmentType}

@@ -1,0 +1,266 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create Application Auto Scaling.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  V2MaxCapacity:
+    Type: Number
+    Default: 9
+  V2MinCapacity:
+    Type: Number
+    Default: 3
+  V2TargetScalingPolicyOutCooldown:
+    Type: Number
+    Default: 300
+  V2TargetScalingPolicyInCooldown:
+    Type: Number
+    Default: 300
+  V2TargetValueCpu:
+    Type: Number
+    Default: 30
+  V2TargetValueMemory:
+    Type: Number
+    Default: 50
+  WorldschoolMaxCapacity:
+    Type: Number
+    Default: 9
+  WorldschoolMinCapacity:
+    Type: Number
+    Default: 3
+  WorldschoolTargetScalingPolicyOutCooldown:
+    Type: Number
+    Default: 300
+  WorldschoolTargetScalingPolicyInCooldown:
+    Type: Number
+    Default: 300
+  WorldschoolTargetValueCpu:
+    Type: Number
+    Default: 30
+  WorldschoolTargetValueMemory:
+    Type: Number
+    Default: 50
+  AdminMaxCapacity:
+    Type: Number
+    Default: 9
+  AdminMinCapacity:
+    Type: Number
+    Default: 3
+  AdminTargetScalingPolicyOutCooldown:
+    Type: Number
+    Default: 30
+  AdminTargetScalingPolicyInCooldown:
+    Type: Number
+    Default: 30
+  AdminTargetValueCpu:
+    Type: Number
+    Default: 30
+  AdminTargetValueMemory:
+    Type: Number
+    Default: 50
+  ECSClusterID:
+    Type: String
+  V2ECSServiceName:
+    Type: String
+  WorldschoolECSServiceName:
+    Type: String
+  AdminECSServiceName:
+    Type: String
+
+#--------------------------------#
+# Conditions section
+#--------------------------------#
+#Conditions:
+#  V2AutoScaleEnable:
+#    !Equals [ !Ref V2AutoScaleEnable, "ON"]
+#  WorldschoolAutoScaleEnable:
+#    !Equals [ !Ref WorldschoolAutoScaleEnable, "ON"]
+#  AdminAutoScaleEnable:
+#    !Equals [ !Ref AdminAutoScaleEnable, "ON"]
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  #
+  # IAM Role
+  #
+  AutoscalingRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [application-autoscaling.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: service-autoscaling
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'application-autoscaling:*'
+              - 'cloudwatch:DescribeAlarms'
+              - 'cloudwatch:PutMetricAlarm'
+              - 'ecs:DescribeServices'
+              - 'ecs:UpdateService'
+            Resource: '*'
+
+  #
+  # Application Auto Scaling 設定
+  #   - ターゲット追跡スケーリング
+  #
+  V2ScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: AutoscalingRole
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      RoleARN: !GetAtt AutoscalingRole.Arn
+      MaxCapacity: !Ref V2MaxCapacity
+      MinCapacity: !Ref V2MinCapacity
+      ResourceId: !Join
+        - /
+        - - service
+          - !Ref ECSClusterID
+          - !Ref V2ECSServiceName
+
+  V2ScalingPolicyCpu:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: V2ScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-v2-scale-policy-cpu-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref V2ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref V2TargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref V2TargetScalingPolicyInCooldown
+        TargetValue: !Ref V2TargetValueCpu
+
+  V2ScalingPolicyMemory:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: V2ScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-v2-scale-policy-memory-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref V2ScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref V2TargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref V2TargetScalingPolicyInCooldown
+        TargetValue: !Ref V2TargetValueMemory
+
+  WorldschoolScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: AutoscalingRole
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      RoleARN: !GetAtt AutoscalingRole.Arn
+      MaxCapacity: !Ref WorldschoolMaxCapacity
+      MinCapacity: !Ref WorldschoolMinCapacity
+      ResourceId: !Join
+        - /
+        - - service
+          - !Ref ECSClusterID
+          - !Ref WorldschoolECSServiceName
+
+  WorldschoolScalingPolicyCpu:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: WorldschoolScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-worldschool-scale-policy-cpu-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WorldschoolScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref WorldschoolTargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref WorldschoolTargetScalingPolicyInCooldown
+        TargetValue: !Ref WorldschoolTargetValueCpu
+
+  WorldschoolScalingPolicyCpuMemory:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: WorldschoolScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-worldschool-scale-policy-memory-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref WorldschoolScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref WorldschoolTargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref WorldschoolTargetScalingPolicyInCooldown
+        TargetValue: !Ref WorldschoolTargetValueMemory
+
+  AdminScalableTarget:
+    Type: AWS::ApplicationAutoScaling::ScalableTarget
+    DependsOn: AutoscalingRole
+    Properties:
+      ServiceNamespace: ecs
+      ScalableDimension: ecs:service:DesiredCount
+      RoleARN: !GetAtt AutoscalingRole.Arn
+      MaxCapacity: !Ref AdminMaxCapacity
+      MinCapacity: !Ref AdminMinCapacity
+      ResourceId: !Join
+        - /
+        - - service
+          - !Ref ECSClusterID
+          - !Ref AdminECSServiceName
+
+  AdminScalingPolicyCpu:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: AdminScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-admin-scale-policy-cpu-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AdminScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageCPUUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref AdminTargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref AdminTargetScalingPolicyInCooldown
+        TargetValue: !Ref AdminTargetValueCpu
+
+  AdminScalingPolicyMemory:
+    Type: AWS::ApplicationAutoScaling::ScalingPolicy
+    DependsOn: AdminScalableTarget
+    Properties:
+      PolicyName: !Sub ${ServiceName}-admin-scale-policy-memory-${EnvironmentType}
+      PolicyType: TargetTrackingScaling
+      ScalingTargetId: !Ref AdminScalableTarget
+      TargetTrackingScalingPolicyConfiguration:
+        PredefinedMetricSpecification:
+          PredefinedMetricType: ECSServiceAverageMemoryUtilization
+        DisableScaleIn: false
+        ScaleOutCooldown: !Ref AdminTargetScalingPolicyOutCooldown
+        ScaleInCooldown: !Ref AdminTargetScalingPolicyInCooldown
+        TargetValue: !Ref AdminTargetValueMemory
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+#Outputs:

@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  CloudFormation Nest Template Parent.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  TemplateBucket:
+    Type: String
+  ServiceName:
+    Type: String
+  EnvironmentType:
+    Type: String
+  VpcCider:
+    Type: String
+  PublicSubnetACider:
+    Type: String
+  PublicSubnetCCider:
+    Type: String
+  PrivateSubnetACider:
+    Type: String
+  PrivateSubnetCCider:
+    Type: String
+  SecureSubnetACider:
+    Type: String
+  SecureSubnetCCider:
+    Type: String
+  #CreateVPC:
+  #  Type: String
+  #  Default: Yes
+
+#--------------------------------#
+# Conditions section
+#--------------------------------#
+#Conditions:
+#  CreateVPC: !Equals [ !Ref CreateVPC, "Yes"]
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  NestVPCCommon:
+    Type: "AWS::CloudFormation::Stack"
+    #Condition: CreateVPC
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/common/vpc.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        VpcCider: !Ref VpcCider
+        PublicSubnetACider: !Ref PublicSubnetACider
+        PublicSubnetCCider: !Ref PublicSubnetCCider
+        PrivateSubnetACider: !Ref PrivateSubnetACider
+        PrivateSubnetCCider: !Ref PrivateSubnetCCider
+        SecureSubnetACider: !Ref SecureSubnetACider
+        SecureSubnetCCider: !Ref SecureSubnetCCider

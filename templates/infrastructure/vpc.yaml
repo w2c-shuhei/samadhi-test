@@ -1,0 +1,342 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create VPC(VPC, Subnet, IGW, RouteTable).
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  VpcCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Elb01SubnetACider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Elb02SubnetCCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  WeB01SubnetCCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Web02SubnetACider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Rds01SubnetCCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Rds02SubnetACider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Elasicache01SubnetCCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Elasicache02SubnetACider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Job01SubnetACider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Job02SubnetCCider:
+    Type: String
+    MinLength: "9"
+    MaxLength: "18"
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  #
+  # Create VPC
+  #
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCider
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      InstanceTenancy: default
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-vpc-${EnvironmentType}
+
+  #
+  # Create RouteTable
+  #
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-route-table-${EnvironmentType}
+
+  #
+  # Create subnet
+  #
+  Elb01SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Elb01SubnetACider
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-elb01-subnet-${EnvironmentType}
+  Elb01SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Elb01SubnetA
+      RouteTableId: !Ref RouteTable
+
+  Elb02SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Elb02SubnetCCider
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-elb02-subnet-${EnvironmentType}
+  Elb02SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Elb02SubnetC
+      RouteTableId: !Ref RouteTable
+
+  Web01SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref WeB01SubnetCCider
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-web01-subnet-${EnvironmentType}
+  Web01SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Web01SubnetC
+      RouteTableId: !Ref RouteTable
+
+  Web02SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Web02SubnetACider
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-web02-subnet-${EnvironmentType}
+  Web02SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Web02SubnetA
+      RouteTableId: !Ref RouteTable
+
+  Rds01SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Rds01SubnetCCider
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-rds01-subnet-${EnvironmentType}
+  Rds01SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Rds01SubnetC
+      RouteTableId: !Ref RouteTable
+
+  Rds02SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Rds02SubnetACider
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-rds02-subnet-${EnvironmentType}
+  Rds02SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Rds02SubnetA
+      RouteTableId: !Ref RouteTable
+
+  Elasicache01SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Elasicache01SubnetCCider
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-elasicache01-subnet-${EnvironmentType}
+  Elasicache01SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Elasicache01SubnetC
+      RouteTableId: !Ref RouteTable
+
+  Elasicache02SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Elasicache02SubnetACider
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-elasicache02-subnet-${EnvironmentType}
+  Elasicache02SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Elasicache02SubnetA
+      RouteTableId: !Ref RouteTable
+
+  Job01SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Job01SubnetACider
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-job01-subnet-${EnvironmentType}
+  Job01SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Job01SubnetA
+      RouteTableId: !Ref RouteTable
+
+  Job02SubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Ref Job02SubnetCCider
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-job02-subnet-${EnvironmentType}
+  Job02SubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref Job02SubnetC
+      RouteTableId: !Ref RouteTable
+
+  #
+  # Create InternetGateway
+  #
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+    Properties:
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-igw-${EnvironmentType}
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  AddRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+Outputs:
+  VPC:
+    Value: !Ref VPC
+    Export:
+      Name: !Sub ${ServiceName}-vpc-id-${EnvironmentType}
+
+  Elb01SubnetA:
+    Value: !Ref Elb01SubnetA
+    Export:
+      Name: !Sub ${ServiceName}-elb01-sbunet-id-${EnvironmentType}
+
+  Elb02SubnetC:
+    Value: !Ref Elb02SubnetC
+    Export:
+      Name: !Sub ${ServiceName}-elb02-sbunet-id-${EnvironmentType}
+
+  Web01SubnetC:
+    Value: !Ref Web01SubnetC
+    Export:
+      Name: !Sub ${ServiceName}-web01-sbunet-id-${EnvironmentType}
+
+  Web02SubnetA:
+    Value: !Ref Web02SubnetA
+    Export:
+      Name: !Sub ${ServiceName}-web02-sbunet-id-${EnvironmentType}
+
+  Rds01SubnetC:
+    Value: !Ref Rds01SubnetC
+    Export:
+      Name: !Sub ${ServiceName}-rds01-sbunet-id-${EnvironmentType}
+
+  Rds02SubnetA:
+    Value: !Ref Rds02SubnetA
+    Export:
+      Name: !Sub ${ServiceName}-rds02-sbunet-id-${EnvironmentType}
+
+  Elasicache01SubnetC:
+    Value: !Ref Elasicache01SubnetC
+    Export:
+      Name: !Sub ${ServiceName}-elasicache01-sbunet-id-${EnvironmentType}
+
+  Elasicache02SubnetA:
+    Value: !Ref Elasicache02SubnetA
+    Export:
+      Name: !Sub ${ServiceName}-elasicache02-sbunet-id-${EnvironmentType}
+
+  Job01SubnetA:
+    Value: !Ref Job01SubnetA
+    Export:
+      Name: !Sub ${ServiceName}-job01-sbunet-id-${EnvironmentType}
+
+  Job02SubnetC:
+    Value: !Ref Job02SubnetC
+    Export:
+      Name: !Sub ${ServiceName}-job02-sbunet-id-${EnvironmentType}
+
+  RouteTable:
+    Value: !Ref RouteTable
+    Export:
+      Name: !Sub ${ServiceName}-route-table-id-${EnvironmentType}

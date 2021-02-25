@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  CloudFormation Nest Template Parent.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  TemplateBucket:
+    Type: String
+  ServiceName:
+    Type: String
+  EnvironmentType:
+    Type: String
+  VpcCider:
+    Type: String
+  Elb01SubnetACider:
+    Type: String
+  Elb02SubnetCCider:
+    Type: String
+  WeB01SubnetCCider:
+    Type: String
+  Web02SubnetACider:
+    Type: String
+  Rds01SubnetCCider:
+    Type: String
+  Rds02SubnetACider:
+    Type: String
+  Elasicache01SubnetCCider:
+    Type: String
+  Elasicache02SubnetACider:
+    Type: String
+  Job01SubnetACider:
+    Type: String
+  Job02SubnetCCider:
+    Type: String
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  NestVPC:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/infrastructure/vpc.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        VpcCider: !Ref VpcCider
+        Elb01SubnetACider: !Ref Elb01SubnetACider
+        Elb02SubnetCCider: !Ref Elb02SubnetCCider
+        WeB01SubnetCCider: !Ref WeB01SubnetCCider
+        Web02SubnetACider: !Ref Web02SubnetACider
+        Rds01SubnetCCider: !Ref Rds01SubnetCCider
+        Rds02SubnetACider: !Ref Rds02SubnetACider
+        Elasicache01SubnetCCider: !Ref Elasicache01SubnetCCider
+        Elasicache02SubnetACider: !Ref Elasicache02SubnetACider
+        Job01SubnetACider: !Ref Job01SubnetACider
+        Job02SubnetCCider: !Ref Job02SubnetCCider

@@ -1,0 +1,98 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Create EFS.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  ServiceName:
+    Type: String
+    Default: feelnote
+  EnvironmentType:
+    Type: String
+    AllowedValues:
+      - prod
+      - stg
+      - dev
+      - load
+  VpcId:
+    Type: String
+    MinLength: 12
+    MaxLength: 21
+    AllowedPattern: vpc-[0-9a-z]*
+  VpcCider:
+    Type: String
+    MinLength: 9
+    MaxLength: 18
+    AllowedPattern: "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})"
+  Web01SubnetCId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+  Web02SubnetAId:
+    Type: String
+    MinLength: 15
+    MaxLength: 24
+    AllowedPattern: subnet-[0-9a-z]*
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ServiceName}-efs-sg-${EnvironmentType}
+      GroupDescription: !Sub ${ServiceName}-efs-sg-${EnvironmentType}
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          CidrIp: !Ref VpcCider
+          Description: NFS
+      Tags:
+      - Key: Name
+        Value: !Sub ${ServiceName}-efs-sg-${EnvironmentType}
+      VpcId: !Ref VpcId
+
+  EFS:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      PerformanceMode: generalPurpose
+      ThroughputMode: bursting
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+      BackupPolicy:
+        Status: ENABLED
+      Encrypted: true
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub ${ServiceName}-efs-${EnvironmentType}
+
+  EFSMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SecurityGroups:
+        - !Ref SecurityGroup
+      SubnetId: !Ref Web01SubnetCId
+
+  EFSMountTargetC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFS
+      SecurityGroups:
+        - !Ref SecurityGroup
+      SubnetId: !Ref Web02SubnetAId
+
+#--------------------------------#
+# Outputs section
+#--------------------------------#
+Outputs:
+  EFS:
+    Value: !Ref EFS
+    Export:
+      Name: !Sub ${ServiceName}-efs-id-${EnvironmentType}

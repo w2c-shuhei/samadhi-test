@@ -1,0 +1,249 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  CloudFormation Nest Template Parent.
+
+#--------------------------------#
+# Parameters section
+#--------------------------------#
+Parameters:
+  TemplateBucket:
+    Type: String
+  ServiceName:
+    Type: String
+  EnvironmentType:
+    Type: String
+  LoadBalancerPublic:
+    Type: String
+  SubDomainNmae1:
+    Type: String
+  SubDomainNmae2:
+    Type: String
+  SubDomainNmae3:
+    Type: String
+  VpcId:
+    Type: String
+  VpcCider:
+    Type: String
+  ELB01SubnetAId:
+    Type: String
+  ELB02SubnetCId:
+    Type: String
+  WEB01SubnetCId:
+    Type: String
+  WEB02SubnetAId:
+    Type: String
+  CreateEFS:
+    Type: String
+  IdleTimeoutSeconds:
+    Type: String
+  ListenerCertificateArn:
+    Type: String
+  AlbListenerSslPolicy:
+    Type: String
+  ECSV2TaskCPUUnit:
+    Type: String
+  ECSV2TaskMemory:
+    Type: String
+  ECSWordschoolTaskCPUUnit:
+    Type: String
+  ECSWordschoolTaskMemory:
+    Type: String
+  ECSAdminTaskCPUUnit:
+    Type: String
+  ECSAdminTaskMemory:
+    Type: String
+  ECSV2ContainerPort:
+    Type: String
+  ECSWordschoolContainerPort:
+    Type: String
+  ECSAdminContainerPort:
+    Type: String
+  ECSV2ImageName:
+    Type: String
+  ECSWorldschoolImageName:
+    Type: String
+  ECSAdminImageName:
+    Type: String
+  ECSV2TaskDesiredCount:
+    Type: String
+  ECSWorldschoolTaskDesiredCount:
+    Type: String
+  ECSAdminTaskDesiredCount:
+    Type: String
+  ECSFilesyStemId:
+    Type: String
+  AutoScalingEnable:
+    Type: String
+  V2MaxCapacity:
+    Type: String
+  V2MinCapacity:
+    Type: String
+  V2TargetScalingPolicyOutCooldown:
+    Type: String
+  V2TargetScalingPolicyInCooldown:
+    Type: String
+  V2TargetValueCpu:
+    Type: String
+  V2TargetValueMemory:
+    Type: String
+  WorldschoolMaxCapacity:
+    Type: String
+  WorldschoolMinCapacity:
+    Type: String
+  WorldschoolTargetScalingPolicyOutCooldown:
+    Type: String
+  WorldschoolTargetScalingPolicyInCooldown:
+    Type: String
+  WorldschoolTargetValueCpu:
+    Type: String
+  WorldschoolTargetValueMemory:
+    Type: String
+  AdminMaxCapacity:
+    Type: String
+  AdminMinCapacity:
+    Type: String
+  AdminTargetScalingPolicyOutCooldown:
+    Type: String
+  AdminTargetScalingPolicyInCooldown:
+    Type: String
+  AdminTargetValueCpu:
+    Type: String
+  AdminTargetValueMemory:
+    Type: String
+
+
+#--------------------------------#
+# Conditions section
+#--------------------------------#
+Conditions:
+  CreateEFS:
+    !Equals [ !Ref CreateEFS, "true"]
+  AutoScalingEnable:
+    !Equals [ !Ref AutoScalingEnable, "true"]
+
+#--------------------------------#
+# Resources section
+#--------------------------------#
+Resources:
+  NestEFS:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateEFS
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/infrastructure/efs.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        VpcId: !Ref VpcId
+        VpcCider: !Ref VpcCider
+        WEB01SubnetCId: !Ref WEB01SubnetCId
+        WEB02SubnetAId: !Ref WEB02SubnetAId
+
+  NestLoadBalancer:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/service/load-balancer.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        LoadBalancerPublic: !Ref LoadBalancerPublic
+        SubDomainNmae1: !Ref SubDomainNmae1
+        SubDomainNmae2: !Ref SubDomainNmae2
+        SubDomainNmae3: !Ref SubDomainNmae3
+        VpcId: !Ref VpcId
+        VpcCider: !Ref VpcCider
+        ELB01SubnetAId: !Ref ELB01SubnetAId
+        ELB02SubnetCId: !Ref ELB02SubnetCId
+        IdleTimeoutSeconds: !Ref IdleTimeoutSeconds
+        ListenerCertificateArn: !Ref ListenerCertificateArn
+        AlbListenerSslPolicy: !Ref AlbListenerSslPolicy
+
+  NestEcsCluser:
+    Type: AWS::CloudFormation::Stack
+    DependsOn: NestLoadBalancer
+      #- NestEFS
+      #- NestLoadBalancer
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/service/ecs-cluster.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        VpcId: !Ref VpcId
+        VpcCider: !Ref VpcCider
+        # NestSecurityGroupにて作成したSGを !GetAtt *.Outputs.* で取得
+        #AlbSgID: !GetAtt
+        #  - NestSecurityGroup
+        #  - Outputs.AlbSgID
+        ELB01SubnetAId: !Ref ELB01SubnetAId
+        ELB02SubnetCId: !Ref ELB02SubnetCId
+        WEB01SubnetCId: !Ref WEB01SubnetCId
+        WEB02SubnetAId: !Ref WEB02SubnetAId
+        CreateEFS: !Ref CreateEFS
+        ECSV2TaskCPUUnit: !Ref ECSV2TaskCPUUnit
+        ECSV2TaskMemory: !Ref ECSV2TaskMemory
+        ECSWordschoolTaskCPUUnit: !Ref ECSWordschoolTaskCPUUnit
+        ECSWordschoolTaskMemory: !Ref ECSWordschoolTaskMemory
+        ECSAdminTaskCPUUnit: !Ref ECSAdminTaskCPUUnit
+        ECSAdminTaskMemory: !Ref ECSAdminTaskMemory
+        ECSV2ContainerPort: !Ref ECSV2ContainerPort
+        ECSWordschoolContainerPort: !Ref ECSWordschoolContainerPort
+        ECSAdminContainerPort: !Ref ECSAdminContainerPort
+        ECSV2ImageName: !Ref ECSV2ImageName
+        ECSWorldschoolImageName: !Ref ECSWorldschoolImageName
+        ECSAdminImageName: !Ref ECSAdminImageName
+        ECSV2TaskDesiredCount: !Ref ECSV2TaskDesiredCount
+        ECSWorldschoolTaskDesiredCount: !Ref ECSWorldschoolTaskDesiredCount
+        ECSAdminTaskDesiredCount: !Ref ECSAdminTaskDesiredCount
+        ECSFilesyStemId: !Ref ECSFilesyStemId
+        ###ECSFilesyStemId2: !GetAtt
+        ###  - NestEFS
+        ###  - Outputs.EFS
+        V2TargetGroupARN: !GetAtt
+          - NestLoadBalancer
+          - Outputs.V2TargetGroupARN
+        WorldschoolTargetGroupARN: !GetAtt
+          - NestLoadBalancer
+          - Outputs.WorldschoolTargetGroupARN
+        AdminTargetGroupARN: !GetAtt
+          - NestLoadBalancer
+          - Outputs.AdminTargetGroupARN
+
+  NestAutoScaling:
+    Type: AWS::CloudFormation::Stack
+    Condition: AutoScalingEnable
+    DependsOn: NestEcsCluser
+    Properties:
+      TemplateURL: !Sub "https://s3.amazonaws.com/${TemplateBucket}/samadhi-test/templates/service/auto-scaling.yaml"
+      Parameters:
+        ServiceName: !Ref ServiceName
+        EnvironmentType: !Ref EnvironmentType
+        V2MaxCapacity: !Ref V2MaxCapacity
+        V2MinCapacity: !Ref V2MinCapacity
+        V2TargetScalingPolicyOutCooldown: !Ref V2TargetScalingPolicyOutCooldown
+        V2TargetScalingPolicyInCooldown: !Ref V2TargetScalingPolicyInCooldown
+        V2TargetValueCpu: !Ref V2TargetValueCpu
+        V2TargetValueMemory: !Ref V2TargetValueMemory
+        WorldschoolMaxCapacity: !Ref WorldschoolMaxCapacity
+        WorldschoolMinCapacity: !Ref WorldschoolMinCapacity
+        WorldschoolTargetScalingPolicyOutCooldown: !Ref WorldschoolTargetScalingPolicyOutCooldown
+        WorldschoolTargetScalingPolicyInCooldown: !Ref WorldschoolTargetScalingPolicyInCooldown
+        WorldschoolTargetValueCpu: !Ref WorldschoolTargetValueCpu
+        WorldschoolTargetValueMemory: !Ref WorldschoolTargetValueMemory
+        AdminMaxCapacity: !Ref AdminMaxCapacity
+        AdminMinCapacity: !Ref AdminMinCapacity
+        AdminTargetScalingPolicyOutCooldown: !Ref AdminTargetScalingPolicyOutCooldown
+        AdminTargetScalingPolicyInCooldown: !Ref AdminTargetScalingPolicyInCooldown
+        AdminTargetValueCpu: !Ref AdminTargetValueCpu
+        AdminTargetValueMemory: !Ref AdminTargetValueMemory
+        ECSClusterID: !GetAtt
+          - NestEcsCluser
+          - Outputs.ECSClusterID
+        V2ECSServiceName: !GetAtt
+          - NestEcsCluser
+          - Outputs.V2ECSServiceName
+        WorldschoolECSServiceName: !GetAtt
+          - NestEcsCluser
+          - Outputs.WorldschoolECSServiceName
+        AdminECSServiceName: !GetAtt
+          - NestEcsCluser
+          - Outputs.AdminECSServiceName
